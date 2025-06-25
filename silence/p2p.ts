@@ -6,8 +6,12 @@ export default class P2PClient {
     private connections: Record<string, DataConnection[]> = {};
     public devices: Set<string> = new Set();
     private idx = 0;
+    netChangeHandler: () => void;
 
-    constructor(private baseToken: string, private maxPeers: number) { }
+    constructor(private baseToken: string, private maxPeers: number, netChangeHandler: () => void) {
+        this.autoClean()
+        this.netChangeHandler = netChangeHandler
+    }
 
     // 初始化Peer连接
     async init(): Promise<void> {
@@ -23,6 +27,10 @@ export default class P2PClient {
         }
     }
 
+
+    private autoClean(): void {
+        addEventListener('beforeunload', this.clear)
+    }
     // 创建并检查Peer ID是否可用
     private createPeerIfAvailable(id: string): Promise<Peer> {
         return new Promise((resolve, reject) => {
@@ -64,6 +72,7 @@ export default class P2PClient {
                 this.devices.add(conn.peer);
                 this.connections[conn.peer] = this.connections[conn.peer] || [];
                 this.connections[conn.peer].push(conn);
+                this.netChangeHandler()
             });
 
             conn.on("data", (data) => {
@@ -74,6 +83,7 @@ export default class P2PClient {
             conn.on("close", () => {
                 this.devices.delete(conn.peer);
                 delete this.connections[conn.peer];
+                this.netChangeHandler()
             });
 
             conn.on("error", (error) => {
@@ -83,15 +93,6 @@ export default class P2PClient {
 
         this.peer.on("error", (error) => {
             console.error("Peer error:", error);
-        });
-    }
-
-    // 连接到所有已知设备
-    connectAll(): void {
-        Array.from(this.devices).forEach((id) => {
-            if (!this.connections[id] && this.peer?.id !== id) {
-                this.peer?.connect(id);
-            }
         });
     }
 
@@ -107,7 +108,7 @@ export default class P2PClient {
     }
 
     // 扫描可用的Peer ID
-    scan(): void {
+    scanAndConnect(): void {
         if (!this.peer) return;
         for (let i = 0; i < this.maxPeers; i++) {
             const id = this.baseToken + i;
@@ -122,6 +123,7 @@ export default class P2PClient {
 
     // 清理资源
     clear(): void {
+        removeEventListener("beforeunload", this.clear)
         if (this.peer) {
             Object.values(this.connections).forEach((connList) => {
                 connList.forEach((conn) => conn.close());

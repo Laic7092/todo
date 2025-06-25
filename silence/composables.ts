@@ -1,36 +1,31 @@
 import SilenceIDB from './db';
 import P2PClient from './p2p';
-import { ref, onUnmounted, onMounted } from "vue";
+import { ref } from "vue";
 
 export const useP2P = (
     baseToken: string = "BRK-P2P-TOKEN-",
     maxPeers: number = 3
 ) => {
-    const client = new P2PClient(baseToken, maxPeers);
     const devices = ref();
     const myId = ref()
 
-
     const setReactivitys = () => {
         myId.value = client.getPeerId()
-        devices.value = client.devices
+        devices.value = JSON.parse(JSON.stringify(Array.from(client.devices)))
     }
-    // 初始化
-    onMounted(async () => {
-        await client.init();
-        setInterval(() => {
-            client.scan();
-            client.connectAll();
-            setReactivitys()
-        }, 3000);
-    });
 
-    // 生命周期管理
-    onUnmounted(() => {
-        client.clear();
-    });
+    const client = new P2PClient(baseToken, maxPeers, setReactivitys);
+
+    const init = () => client.init().then(setReactivitys)
+
+    const scan = () => client.scanAndConnect()
+
+    init()
+    setInterval(scan, 5000)
 
     return {
+        init,
+        scan,
         devices,
         myId,
     };
