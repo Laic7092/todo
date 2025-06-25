@@ -15,7 +15,7 @@ interface OperateRecord {
     data?: any;
 }
 
-class SilenceIDB {
+export default class SilenceIDB {
     dbName: string;
     db: IDBDatabase | null;
     dbVersion: number = 1;
@@ -225,5 +225,3 @@ class SilenceIDB {
         });
     };
 }
-
-export default SilenceIDB;
