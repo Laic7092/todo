@@ -1,16 +1,30 @@
 import Peer, { DataConnection } from "peerjs";
 
+export enum EventType {
+    connect,
+    disconnect,
+    data
+}
+
+interface Config {
+    baseToken: string
+    maxPeers: number
+}
+
 // 独立的P2P客户端类
 export default class P2PClient {
+    private baseToken: string
+    private maxPeers: number
     protected peer: Peer | null = null;
     private connections: Record<string, DataConnection[]> = {};
     public devices: Set<string> = new Set();
     private idx = 0;
-    netChangeHandler: () => void;
+    private handlers: Map<EventType, (e: any) => void> = new Map()
 
-    constructor(private baseToken: string, private maxPeers: number, netChangeHandler: () => void) {
+    constructor(config: Config) {
+        this.baseToken = config.baseToken
+        this.maxPeers = config.maxPeers
         this.autoClean()
-        this.netChangeHandler = netChangeHandler
     }
 
     // 初始化Peer连接
@@ -26,8 +40,6 @@ export default class P2PClient {
             }
         }
     }
-
-
     private autoClean(): void {
         addEventListener('beforeunload', this.clear)
     }
@@ -64,7 +76,7 @@ export default class P2PClient {
     }
 
     // 设置事件监听
-    setListeners(): void {
+    private setListeners(): void {
         if (!this.peer) return;
 
         this.peer.on("connection", (conn) => {
@@ -72,18 +84,21 @@ export default class P2PClient {
                 this.devices.add(conn.peer);
                 this.connections[conn.peer] = this.connections[conn.peer] || [];
                 this.connections[conn.peer].push(conn);
-                this.netChangeHandler()
+                const handler = this.handlers.get(EventType.connect)
+                handler && handler(conn.peer)
             });
 
             conn.on("data", (data) => {
                 console.log("Received data:", data);
-                alert(data);
+                const handler = this.handlers.get(EventType.data)
+                handler && handler(data);
             });
 
             conn.on("close", () => {
                 this.devices.delete(conn.peer);
                 delete this.connections[conn.peer];
-                this.netChangeHandler()
+                const handler = this.handlers.get(EventType.disconnect)
+                handler && handler(conn.peer)
             });
 
             conn.on("error", (error) => {
@@ -134,5 +149,23 @@ export default class P2PClient {
             this.devices.clear();
             this.idx = 0;
         }
+    }
+
+    send(deviceId: string, data: any): void {
+        if (!this.connections[deviceId]) {
+            this.peer?.connect(deviceId);
+        }
+        this.connections[deviceId]?.forEach((conn) => {
+            if (conn.open) {
+                conn.send(data);
+            }
+        });
+    }
+    on(eventType: EventType, handler: (e: any) => void) {
+        this.handlers.set(eventType, handler)
+    }
+
+    off(eventType: EventType) {
+        this.handlers.delete(eventType)
     }
 }
