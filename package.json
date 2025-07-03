@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "peerjs": "^1.5.5",
+    "vconsole": "^3.15.1",
     "vue": "^3.5.17"
   },
   "devDependencies": {
