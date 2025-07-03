@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "build-nots": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build-preview": "vue-tsc --noEmit && vite build && vite preview --host"
   },
   "dependencies": {
     "peerjs": "^1.5.5",

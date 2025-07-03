@@ -17,9 +17,9 @@ const submit = () => {
     <button @click="submit">提交</button>
   </div>
   <ul>
-    <li v-for="item in todoList" :key="item.id">
-      <input type="checkbox" v-model="item.done" @change="update(item.id, { ...item, done: $event })" />
-      <input v-model="item.text" @change="update(item.id, { ...item, text: $event })">
+    <li v-for="item in todoList">
+      <input type="checkbox" :value="item.done" @change="update(item.id, { ...item, done: $event.target.checked })" />
+      <input :value="item.text" @change="update(item.id, { ...item, text: $event.target.value })">
       <button @click="remove(item.id)">删除</button>
     </li>
   </ul>

@@ -1,11 +1,11 @@
-enum Operate {
-    add = 'add',
-    put = 'put',
-    delete = 'delete',
-    clear = 'clear'
+export enum Operate {
+    add,
+    put,
+    delete,
+    clear,
 }
 
-interface OperateRecord {
+export interface OperateRecord {
     id: string;
     timestamp: number;
     dbName: string;
@@ -15,11 +15,14 @@ interface OperateRecord {
     data?: any;
 }
 
+type EventHandler<T = any> = (data: T) => void;
+
 export default class SilenceIDB {
     dbName: string;
-    db: IDBDatabase | null;
+    db: IDBDatabase | null = null;
     dbVersion: number = 1;
     initPromise: Promise<void> | null;
+    handlers: Map<Operate, Set<Function>> = new Map();
 
     constructor({
         dbName,
@@ -90,12 +93,15 @@ export default class SilenceIDB {
         const operateStore = transaction.objectStore('operates');
         return new Promise((resolve, reject) => {
             const request = operateStore.add(record);
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                this.emit(operateType, request.result)
+                resolve(request.result)
+            };
             request.onerror = () => reject(request.error);
         });
     }
 
-    private wrapStore(store: IDBObjectStore, storeName: string, transaction: IDBTransaction): IDBObjectStore {
+    private wrapStore(store: IDBObjectStore, storeName: string, transaction: IDBTransaction, recordOperate: boolean): IDBObjectStore {
         return new Proxy(store, {
             get: (target, prop: keyof IDBObjectStore, receiver) => {
                 const original = target[prop];
@@ -104,23 +110,12 @@ export default class SilenceIDB {
                     ['add', 'put', 'delete', 'clear'].includes(prop)) {
 
                     return (...args: any[]) => {
-                        // 对于删除操作，先获取数据
                         let data: any;
-                        // if (prop === 'delete') {
-                        //     data = await new Promise((resolve) => {
-                        //         const req = target.get(args[0]);
-                        //         req.onsuccess = () => resolve(req.result);
-                        //         req.onerror = () => resolve(undefined);
-                        //     });
-                        // }
-
                         const request = (original as Function).apply(target, args);
 
                         request.addEventListener('success', () => {
-                            // 确定操作类型和key
-                            let operateType: Operate | null = null;
+                            let operateType: Operate;
                             let key: any;
-
                             switch (prop) {
                                 case 'add':
                                     operateType = Operate.add;
@@ -140,9 +135,14 @@ export default class SilenceIDB {
                                     operateType = Operate.clear;
                                     break;
                             }
-                            // 记录操作（与主操作同事务）
-                            operateType && this.recordOperation(transaction, storeName, operateType, key, data)
-                                .catch(e => console.error('Record failed:', e));
+                            if (recordOperate) {
+                                this.recordOperation(transaction, storeName, operateType, key, data)
+                                    .catch(e => console.error('Record failed:', e));
+                            } else {
+                                transaction.oncomplete = () => {
+                                    this.emit(operateType, {})
+                                }
+                            }
                         })
 
                         return request;
@@ -154,24 +154,19 @@ export default class SilenceIDB {
         });
     }
 
-    async tx(storeName: string, mode: IDBTransactionMode = 'readonly') {
+    async tx(storeName: string, mode: IDBTransactionMode = 'readonly', options: { recordOperate?: boolean } = {}) {
         await this.initPromise;
         if (!this.db) throw new Error('Database not initialized');
 
-        const transaction = this.db.transaction([storeName, 'operates'], mode);
+        const transaction = this.db.transaction([storeName, ...(options.recordOperate !== false ? ['operates'] : [])], mode);
         const store = transaction.objectStore(storeName);
 
-        return mode === 'readonly' ? store : this.wrapStore(store, storeName, transaction);
-    }
-
-    async getStore(storeName: string, mode: IDBTransactionMode = 'readonly') {
-        const store = await this.tx(storeName, mode);
-        return store;
+        return mode === 'readonly' ? store : this.wrapStore(store, storeName, transaction, options.recordOperate !== false);
     }
 
     // 基础操作方法保持不变，但会通过代理自动记录
-    add = async (storeName: string, data: any) => {
-        const store = await this.tx(storeName, 'readwrite');
+    add = async (storeName: string, data: any, options?: { recordOperate?: boolean }) => {
+        const store = await this.tx(storeName, 'readwrite', options);
         return new Promise((resolve, reject) => {
             const request = store.add(data);
             request.onsuccess = () => resolve(request.result);
@@ -179,8 +174,8 @@ export default class SilenceIDB {
         });
     };
 
-    put = async (storeName: string, data: any, key?: any) => {
-        const store = await this.tx(storeName, 'readwrite');
+    put = async (storeName: string, data: any, key?: any, options?: { recordOperate?: boolean }) => {
+        const store = await this.tx(storeName, 'readwrite', options);
         return new Promise((resolve, reject) => {
             const request = key !== undefined ? store.put(data, key) : store.put(data);
             request.onsuccess = () => resolve(request.result);
@@ -188,8 +183,8 @@ export default class SilenceIDB {
         });
     };
 
-    delete = async (storeName: string, key: any) => {
-        const store = await this.tx(storeName, 'readwrite');
+    delete = async (storeName: string, key: any, options?: { recordOperate?: boolean }) => {
+        const store = await this.tx(storeName, 'readwrite', options);
         return new Promise((resolve, reject) => {
             const request = store.delete(key);
             request.onsuccess = () => resolve();
@@ -210,18 +205,48 @@ export default class SilenceIDB {
         const store = await this.tx(storeName);
         return new Promise((resolve, reject) => {
             const request = store.getAll();
-            request.addEventListener('success', () => console.log('666'));
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
     };
 
-    clear = async (storeName: string) => {
-        const store = await this.tx(storeName, 'readwrite');
+    clear = async (storeName: string, options?: { recordOperate?: boolean }) => {
+        const store = await this.tx(storeName, 'readwrite', options);
         return new Promise((resolve, reject) => {
             const request = store.clear();
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
     };
+
+    // 事件监听
+    on<T = any>(eventType: Operate, handler: EventHandler<T>): void {
+        if (!this.handlers.has(eventType)) {
+            this.handlers.set(eventType, new Set());
+        }
+        this.handlers.get(eventType)!.add(handler);
+    }
+
+    // 移除事件监听
+    off<T = any>(eventType: Operate, handler?: EventHandler<T>): void {
+        if (!handler) {
+            this.handlers.delete(eventType);
+        } else if (this.handlers.has(eventType)) {
+            this.handlers.get(eventType)!.delete(handler);
+        }
+    }
+
+    // 触发事件
+    private emit(eventType: Operate, data?: any): void {
+        const handlers = this.handlers.get(eventType);
+        if (handlers) {
+            handlers.forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    console.error(`Error in ${eventType} handler:`, error);
+                }
+            });
+        }
+    }
 }
