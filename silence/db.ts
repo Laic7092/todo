@@ -177,7 +177,8 @@ export default class SilenceIDB {
     put = async (storeName: string, data: any, key?: any, options?: { recordOperate?: boolean }) => {
         const store = await this.tx(storeName, 'readwrite', options);
         return new Promise((resolve, reject) => {
-            const request = key !== undefined ? store.put(data, key) : store.put(data);
+            // const request = key !== undefined ? store.put(data, key) : store.put(data);
+            const request = store.put(data);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
