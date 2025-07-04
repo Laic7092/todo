@@ -156,11 +156,10 @@ export const useP2P = (
 
     init()
 
-    setInterval(() => reqOperates(), 5000)
-
     return {
         devices,
         myId,
+        reqOperates
     };
 };
 
@@ -201,7 +200,7 @@ export const useTodoList = () => {
         });
     })
 
-    const { devices, myId } = useP2P();
+    const { devices, myId, reqOperates } = useP2P();
 
     const todoList = ref<TodoItem[]>([]);
     idb.getAll('todoList').then(res => {
@@ -238,5 +237,12 @@ export const useTodoList = () => {
         }
     };
 
-    return { todoList, add, remove, update, myId, devices };
+    const clear = () => {
+        idb.clear('todoList').then(() => {
+            todoList.value = [];
+        });
+        idb.clear(OPERATE_ID);
+    }
+
+    return { todoList, add, remove, update, clear, myId, devices, reqOperates };
 };

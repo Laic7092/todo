@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTodoList } from "../silence/composables"
 import { ref } from "vue"
-const { todoList, add, update, remove, myId, devices } = useTodoList()
+const { todoList, add, update, remove, myId, devices, clear, reqOperates } = useTodoList()
 const val = ref("")
 
 const submit = () => {
@@ -24,6 +24,10 @@ const submit = () => {
     </li>
   </ul>
   <hr>
+  <div>
+    <button @click="clear">清空数据库</button>
+    <button @click="reqOperates">同步</button>
+  </div>
   <div>我的ID：{{ myId }}</div>
   <div>
     网络列表
