@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { useTodoList } from "../silence/composables"
+import { useTodoList, useSync } from "../silence/composables"
 import { ref } from "vue"
-const { todoList, add, update, remove, myId, devices, clear, reqOperates } = useTodoList()
+const { todoList, add, update, remove, clear } = useTodoList()
+const { myId, devices, reqOperates } = useSync()
 const val = ref("")
 
 const submit = () => {

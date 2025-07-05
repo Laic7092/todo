@@ -25,7 +25,7 @@ const idb = new SilenceDB({
         db.createObjectStore('todoList', { keyPath: 'id' });
     }
 });
-export const useP2P = (
+export const useSync = (
     baseToken: string = "BRK-P2P-TOKEN-",
     maxPeers: number = 5,
 ) => {
@@ -36,7 +36,7 @@ export const useP2P = (
         devices.value = peer.getConnectedDevices()
     }
 
-    const reqOperates = () => {
+    const sync = () => {
         const devices = peer.getConnectedDevices()
         devices.forEach(device => {
             peer.send(device, {
@@ -158,7 +158,7 @@ export const useP2P = (
     return {
         devices,
         myId,
-        reqOperates
+        reqOperates: sync
     };
 };
 
@@ -169,19 +169,6 @@ export const useTodoList = () => {
         text: string;
         done: boolean;
     }
-
-    // idb.on(Operate.add, (data) => {
-    //     const operate = idb.get(OPERATE_ID, data)
-    //     console.log('add', operate);
-    // })
-    // idb.on(Operate.put, (data) => {
-    //     const operate = idb.get(OPERATE_ID, data)
-    //     console.log('put', operate);
-    // })
-    // idb.on(Operate.delete, (data) => {
-    //     const operate = idb.get(OPERATE_ID, data)
-    //     console.log('del', operate);
-    // })
 
     idb.on(Operate.add, (data) => {
         idb.getAll('todoList').then(res => {
@@ -198,8 +185,6 @@ export const useTodoList = () => {
             todoList.value = res;
         });
     })
-
-    const { devices, myId, reqOperates } = useP2P();
 
     const todoList = ref<TodoItem[]>([]);
     idb.getAll('todoList').then(res => {
@@ -243,5 +228,5 @@ export const useTodoList = () => {
         idb.clear(OPERATE_ID);
     }
 
-    return { todoList, add, remove, update, clear, myId, devices, reqOperates };
+    return { todoList, add, remove, update, clear };
 };
