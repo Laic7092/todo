@@ -26,7 +26,7 @@ const submit = () => {
   <hr>
   <div>
     <button @click="clear">清空数据库</button>
-    <button @click="reqOperates">同步</button>
+    <button @click="reqOperates">获取操作日志</button>
   </div>
   <div>我的ID：{{ myId }}</div>
   <div>

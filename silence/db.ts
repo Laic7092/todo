@@ -17,7 +17,7 @@ export interface OperateRecord {
 
 type EventHandler<T = any> = (data: T) => void;
 
-export default class SilenceIDB {
+export default class SilenceDB {
     dbName: string;
     db: IDBDatabase | null = null;
     dbVersion: number = 1;
@@ -81,7 +81,7 @@ export default class SilenceIDB {
         data?: any
     ) {
         const record: OperateRecord = {
-            id: SilenceIDB.useId(),
+            id: SilenceDB.useId(),
             timestamp: Date.now(),
             dbName: this.dbName,
             storeName,

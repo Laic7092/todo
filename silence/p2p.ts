@@ -15,7 +15,7 @@ interface Config {
 type EventHandler<T = any> = (data: T) => void;
 
 // 独立的P2P客户端类
-export default class P2PClient {
+export default class SilencePeer {
     private readonly baseToken: string;
     private readonly maxPeers: number;
 
@@ -177,7 +177,7 @@ export default class P2PClient {
     }
 
     // 获取当前Peer ID
-    getPeerId(): string | undefined {
+    get id(): string | undefined {
         return this.peer?.id;
     }
 

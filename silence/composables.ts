@@ -1,6 +1,6 @@
-import SilenceIDB, { Operate } from './db';
+import SilenceDB, { Operate } from './db';
 import type { OperateRecord } from './db'
-import P2PClient, { EventType } from './p2p';
+import SilencePeer, { EventType } from './p2p';
 import { ref } from "vue";
 
 enum MsgType {
@@ -19,7 +19,7 @@ interface Msg {
 
 const OPERATE_ID = 'operates'
 
-const idb = new SilenceIDB({
+const idb = new SilenceDB({
     dbName: 'todoList',
     versionchangeHandler: (db) => {
         db.createObjectStore('todoList', { keyPath: 'id' });
@@ -33,16 +33,16 @@ export const useP2P = (
     const myId = ref()
     const setReactivitys = () => {
         console.log("setReactivitys");
-        devices.value = client.getConnectedDevices()
+        devices.value = peer.getConnectedDevices()
     }
 
     const reqOperates = () => {
-        const devices = client.getConnectedDevices()
+        const devices = peer.getConnectedDevices()
         devices.forEach(device => {
-            client.send(device, {
+            peer.send(device, {
                 type: MsgType.requst,
                 id: OPERATE_ID,
-                from: client.getPeerId(),
+                from: peer.id,
                 to: device
             })
         });
@@ -53,7 +53,7 @@ export const useP2P = (
         const [storeName, key] = id.split('/')
         if (type === MsgType.requst) {
             const dt = await (key ? idb.get(storeName, key) : idb.getAll(storeName))
-            client.send(from, { type: MsgType.response, id, from: to, to: from, data: dt })
+            peer.send(from, { type: MsgType.response, id, from: to, to: from, data: dt })
         } else if (type === MsgType.response) {
             if (id === OPERATE_ID) {
                 console.log('diff!');
@@ -146,13 +146,12 @@ export const useP2P = (
         return operationsToSync.length;
     };
 
-    const client = new P2PClient({ baseToken, maxPeers });
-    client.on(EventType.Connect, setReactivitys)
-    client.on(EventType.Connect, reqOperates)
-    client.on(EventType.Disconnect, setReactivitys)
-    client.on(EventType.Data, dataHandler)
+    const peer = new SilencePeer({ baseToken, maxPeers });
+    peer.on(EventType.Connect, setReactivitys)
+    peer.on(EventType.Disconnect, setReactivitys)
+    peer.on(EventType.Data, dataHandler)
 
-    const init = () => client.init().then(() => myId.value = client.getPeerId())
+    const init = () => peer.init().then(() => myId.value = peer.id)
 
     init()
 
@@ -208,7 +207,7 @@ export const useTodoList = () => {
     });
     const add = async (text: string) => {
         try {
-            const id = SilenceIDB.useId()
+            const id = SilenceDB.useId()
             await idb.add('todoList', { text, done: false, id });
             todoList.value.push({ id, text, done: false });
         } catch (error) {
